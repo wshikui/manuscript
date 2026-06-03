@@ -2,7 +2,7 @@
 #include "Node.h"
 #include <queue>
 #include <bitset>
-//#include "xgboost/c_api.h"
+#include "xgboost/c_api.h"
 
 enum class BoundType {
 	FROM_LP, FROM_MIP
@@ -54,14 +54,12 @@ private:
 	void branch(Node* current_node);
 	bool branch_on_vertex_select(Node* current_node);
 	bool branch_on_successive_coils(Node* current_node);
-	void branch_on_random(Node* current_node);
 	void branch_strong(Node* current_node, unsigned int nodeNumber);
 
 	//202602: for coding without xgboost
-	//void branch_strong_learn(BoosterHandle pre_model, Node* current_node, unsigned int nodeNumber);
-	//void branch_strong_learn_MF(BoosterHandle pre_model, Node* current_node, unsigned int nodeNumber);
+	void branch_strong_learn(BoosterHandle pre_model, Node* current_node, unsigned int nodeNumber);
 
-	//void initilize_features(std::map<int, std::map<std::string, double>>& _node_features);
+	void initilize_features(std::map<int, std::map<std::string, double>>& _node_features);
 
 	//the candidate variables' features
 	//std::map<int, std::map<std::string, double>> node_variables_features;

@@ -6,14 +6,11 @@
 #include "gurobi_c++.h"
 #include <ilcplex/ilocplex.h>
 
-std::vector<Material*> load(std::string path);
 std::vector<Material*> load_standard_file(std::string path);
 
 void printCoils(const std::vector<Material*>& _coils);
 std::string get_path_name(std::string path);
 int getPlansUp(const std::vector<Material*>& _coils, Parameters* parameters);
-
-void calucateRouteCost(std::vector<Material*>& _materials);
 
 int main() {
 
@@ -25,7 +22,7 @@ int main() {
         "90",
         "150",
         "150",
-        "data/Coils_32_18.txt",
+        "Coils_32.txt",
         "0",    //cpx
         "0",    //gub
         "1",     //bp
@@ -69,8 +66,6 @@ int main() {
     std::cout << "maximum number of plans:" << plansUP << std::endl;
 
     auto problemUnit = new Problem(materials);
-    //problemUnit->printWeight();
-    //problemUnit->printCostMatrixPool("C502016_17");
 
     /// get init columns
     InitColumns initColumns(materials, problemUnit, parameters);
@@ -129,40 +124,6 @@ int main() {
     return 0;
 }
 
-std::vector<Material*> load(std::string path) {
-    std::vector<Material*> materials;
-    std::ifstream infile;
-    infile.open(path.data());
-
-    if (!infile.is_open()) {
-        std::cout << "Open materials txt Failed" << std::endl;
-    }
-
-    std::string str;
-
-    //the real index of coil
-    int _index = 1;
-    while (getline(infile, str)) {
-        std::vector<std::string> keys;
-        std::vector<std::string> values;
-
-        std::vector<std::string> kvs = Tool::super_split(str, "; ");
-        for (auto& item : kvs) {
-            std::vector<std::string> kv = Tool::super_split(item, "=>");
-            if (kv.size() < 2) {
-                kv.emplace_back("");
-                std::cout << "Load data: this line has empty attribute" << std::endl;
-            }
-            keys.push_back(kv.at(0));
-            values.push_back(kv.at(1));
-        }
-        auto* material = new Material(keys, values);
-        material->index = _index;
-        materials.emplace_back(material);
-        _index++;
-    }
-    return materials;
-}
 
 std::vector<Material*> load_standard_file(std::string path)
 {
@@ -267,64 +228,5 @@ int getPlansUp(const std::vector<Material*>& _coils, Parameters* parameters) {
     return num;
 }
 
-void calucateRouteCost(std::vector<Material*>& _materials)
-{
-    Problem* pro = new Problem(_materials);
 
-    std::vector<Column> columns;
-
-    std::vector<int> route1 = { 14, 13, 9, 5 };
-    Column column1(pro, route1);
-    std::vector<int> route2 = { 7, 11, 15, 6, 20, 18, 8 };
-    Column column2(pro, route2);
-    std::vector<int> route3 = { 25, 26, 39, 23, 40 };
-    Column column3(pro, route3);
-    std::vector<int> route4 = { 38, 35, 24, 36, 28, 31 };
-    Column column4(pro, route4);
-
-
-    columns.emplace_back(column1);
-    columns.emplace_back(column2);
-    columns.emplace_back(column3);
-    columns.emplace_back(column4);
-
-    for (const auto& item : columns) {
-        std::cout << item.getCost() << std::endl;
-    }
-
-    double obj = 0;
-    for (int r = 0; r < columns.size(); r++) {
-        obj += (columns[r].getCost() * 1 + 0.5 * 500);
-    }
-    std::cout << "objective (upper bound) : " << obj << std::endl;
-
-    double mass512 = 0;
-    double mass008 = 0;
-    for (const auto& item : columns) {
-        std::vector<int> route = item.getRoute();
-        for (const auto& index : route) {
-            if (pro->getFlow(index) == "C512") {
-                mass512 += pro->getWeight(index);
-            }
-            else {
-                mass008 += pro->getWeight(index);
-            }
-        }
-    }
-    std::cout << "C512 : " << mass512 << std::endl;
-    std::cout << "C008 : " << mass008 << std::endl;
-
-    for (int i = 1; i < pro->getVertices() + 1; i++) {
-        double result = 0;
-        for (int r = 0; r < columns.size(); r++) {
-            result += columns[r].contains(i);
-        }
-        if (result >= 1) {
-            std::cout << "vertex " << i << " -> " << result << std::endl;
-        }
-
-    }
-
-    delete pro;
-}
 

@@ -72,8 +72,8 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ExternalIncludePath>$(ExternalIncludePath)</ExternalIncludePath>
-    <IncludePath>$(IncludePath)</IncludePath>
-    <LibraryPath>$(LibraryPath)</LibraryPath>
+    <IncludePath>C:\Users\wshikui\xgboost\include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Users\wshikui\xgboost\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -132,7 +132,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>D:\Software\CPLEX_Studio221\cplex\lib\x64_windows_msvc14\stat_mda;D:\Software\CPLEX_Studio221\concert\lib\x64_windows_msvc14\stat_mda;D:\Software\gurobi1301\win64\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>ilocplex.lib;cplex2210.lib;concert.lib;gurobi130.lib;gurobi_c++md2017.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ilocplex.lib;cplex2210.lib;concert.lib;C:\Users\wshikui\xgboost\lib\xgboost.lib;gurobi130.lib;gurobi_c++md2017.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

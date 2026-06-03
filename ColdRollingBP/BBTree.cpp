@@ -56,7 +56,6 @@ void BBTree::explore_tree() {
 	auto nodeNumber = 0u;
 	auto startTime = std::chrono::high_resolution_clock::now();
 
-	//TODO maybe gap<0.1% can stop
 	while (!unexploredNodes.empty())
 	{
 		//std::cerr << "Nodes in tree: " << unexploredNodes.size() << std::endl;
@@ -90,8 +89,6 @@ void BBTree::explore_tree() {
 		if (current_node->has_fractional_solution() || current_node->has_basic_column_with_cycles() || 
 			current_node->has_integer_coils_with_frac_sol()) {
 			branch(current_node);
-			//branch_strong(current_node, nodeNumber);
-			//branch_strong_learn_MF(xg_model, current_node, nodeNumber);
 		}
 
 		update_lb(current_node, nodeNumber);
@@ -124,9 +121,6 @@ void BBTree::explore_tree() {
 	std::cout << "all run time of branch and price : " << elapsedTime << std::endl;
 	std::cout << "all node solved: " << nodeNumber << std::endl;
 	printResult();
-
-	//save features of all nodes
-	//saveFatures(all_node_features);
 }
 
 void BBTree::printHeader() {
@@ -354,47 +348,6 @@ bool BBTree::branch_on_successive_coils(Node* current_node)
 }
 
 
-void BBTree::branch_on_random(Node* current_node)
-{
-	std::vector<int> indexes;
-	std::vector<double> coeff;
-	for (int i = 1; i < problem->getVertices() + 1; i++) {
-		double val = 0;
-		for (const auto& item : current_node->basicColumns) {
-			auto& column = item.first;
-			auto& coefficient = item.second;
-			val += coefficient * column.contains(i);
-		}
-		if (val > 0 && val < 1) {
-			indexes.emplace_back(i);
-			coeff.emplace_back(val);
-		}
-	}
-
-	//int temp = min_element(coeff.begin(), coeff.end()) - coeff.begin();
-	std::random_device rd;
-	std::mt19937 gen(rd());
-	std::uniform_int_distribution<> dis(0, indexes.size() - 1);
-	int randomIndex = dis(gen);
-
-	int index = indexes[randomIndex];
-
-	//std::string node_name = current_node->name;
-	//std::cout << node_name << std::endl;
-
-	std::shared_ptr<BranchingRule> includeCoil = std::make_shared<IncludeCoil>(index);
-	std::shared_ptr<BranchingRule> excludeCoil = std::make_shared<ExcludeCoil>(index);
-
-	Node* includeNode = new Node(*current_node, includeCoil,
-		current_node->name + "->select_" + std::to_string(index));
-	Node* excludeNode = new Node(*current_node, excludeCoil,
-		current_node->name + "->no_select_" + std::to_string(index));
-
-	unexploredNodes.push(includeNode);
-	unexploredNodes.push(excludeNode);
-	nodesGenerated += 2;
-}
-
 void BBTree::branch_strong(Node* current_node, unsigned int nodeNumber)
 {
 	//get the feature of candidate variable
@@ -565,486 +518,223 @@ void BBTree::branch_strong(Node* current_node, unsigned int nodeNumber)
 	nodesGenerated += 2;
 }
 
-//void BBTree::branch_strong_learn(BoosterHandle pre_model, Node* current_node, unsigned int nodeNumber)
-//{
-//    const double epsilon = 1e-6;
-//
-//    std::map<int, std::map<std::string, double>> node_variables_features;
-//    initilize_features(node_variables_features);
-//
-//    std::vector<int> can_indexes;
-//    std::vector<float> features;
-//
-//    MasterProblem* rmp = current_node->cg->getRMPmodel();
-//
-//    for (int i = 0; i < problem->getVertices(); i++) {
-//        //slack and ceil distances
-//        double val = 0;
-//        for (const auto& item : current_node->basicColumns) {
-//            auto& column = item.first;
-//            auto& coefficient = item.second;
-//            val += coefficient * column.contains(i + 1);
-//        }
-//        if (val <= 0 || val >= 1) {
-//            continue;
-//        }
-//        //the idnex of candidate coil
-//        can_indexes.emplace_back(i + 1);
-//
-//        node_variables_features[i]["is_candidate"] = 1;
-//        node_variables_features[i]["cand_solfracs"] = val;
-//        node_variables_features[i]["cand_slack"] = 1 - val;
-//        //dual and degree
-//        node_variables_features[i]["dual_coil"] = rmp->getDualVariable(i) / (para->setUpCost * para->alpha2 + 200);
-//        node_variables_features[i]["coil_cons_degree"] = static_cast<double>(rmp->getVarNum(i)) / problem->getVertices();
-//
-//        //objective coefficient
-//        auto coef_values = rmp->getCoefAndValue(i + 1);
-//        std::vector<double> coefs_ = std::get<0>(coef_values);
-//        std::vector<double> coefs;
-//        for (int j = 0; j < coefs_.size(); j++) {
-//            coefs.emplace_back(coefs_[j] / (para->setUpCost * para->alpha2 + 200));
-//        }
-//        std::vector<double> values = std::get<1>(coef_values);
-//        std::vector<double> product(coefs.size());
-//        std::transform(coefs.begin(), coefs.end(), values.begin(), product.begin(), std::multiplies<double>());
-//
-//        node_variables_features[i]["coil_obj_count"] = static_cast<double>(coefs.size()) / (para->N * 2);
-//        node_variables_features[i]["coil_obj_max"] = *(std::max_element(coefs.begin(), coefs.end()));
-//        node_variables_features[i]["coil_obj_min"] = *(std::max_element(coefs.begin(), coefs.end()));
-//        node_variables_features[i]["coil_obj_mean"] = std::accumulate(coefs.begin(), coefs.end(), 0.0) / static_cast<double>(coefs.size());
-//        node_variables_features[i]["coil_obj_variance"] = Tool::calculateVariance(coefs);
-//
-//        node_variables_features[i]["coil_y_count"] = static_cast<double>(values.size()) / (para->N * 2);
-//        node_variables_features[i]["coil_y_max"] = *(std::max_element(values.begin(), values.end()));
-//        node_variables_features[i]["coil_y_min"] = *(std::max_element(values.begin(), values.end()));
-//        node_variables_features[i]["coil_y_mean"] = std::accumulate(values.begin(), values.end(), 0.0) / static_cast<double>(values.size());
-//        node_variables_features[i]["coil_y_variance"] = Tool::calculateVariance(values);
-//
-//        node_variables_features[i]["coil_product_mean"] = std::accumulate(product.begin(), product.end(), 0.0) / static_cast<double>(product.size());
-//        node_variables_features[i]["coil_product_max"] = *(std::max_element(product.begin(), product.end()));
-//        node_variables_features[i]["coil_product_min"] = *(std::min_element(product.begin(), product.end()));
-//        node_variables_features[i]["coil_product_variance"] = Tool::calculateVariance(product);
-//
-//        //weight
-//        node_variables_features[i]["coil_weight"] = problem->getWeight(i + 1) / 50;
-//        if (problem->getFlow(i + 1) == "C512") {
-//            node_variables_features[i]["coil_weight_C512"] = problem->getWeight(i + 1) / para->MassFlow[0];
-//        }
-//        else {
-//            node_variables_features[i]["coil_weight_C008"] = problem->getWeight(i + 1) / para->MassFlow[1];
-//        }
-//        node_variables_features[i]["coil_weight_RH"] = rmp->getWeightRH(i + 1);
-//
-//        //number in SR set
-//        node_variables_features[i]["coil_num_SR"] = rmp->getNumSRofCoil(i + 1);
-//
-//        //number of basic columns in coil i's constraint
-//        node_variables_features[i]["coil_constraint_bc"] = rmp->getBCconstraint(i);
-//
-//        //coil in the integer solution
-//        int _inIntegerSol = 0;
-//        bool isFound = false;
-//        for (const auto& item : nodeAttainUb->mipBaseColumns) {
-//            for (const auto& _coil : item.first.getRoute()) {
-//                if (_coil == i + 1) {
-//                    _inIntegerSol = 1;
-//                    isFound = true;
-//                    break;
-//                }
-//            }
-//            if (isFound) {
-//                break;
-//            }
-//        }
-//        node_variables_features[i]["coil_in_up"] = _inIntegerSol;
-//
-//        auto _binding = rmp->isBinding(i);
-//        node_variables_features[i]["coil_cons_bind_count"] = std::get<0>(_binding);
-//        node_variables_features[i]["coil_cons_bind_max"] = std::get<1>(_binding);
-//        node_variables_features[i]["coil_cons_bind_min"] = std::get<2>(_binding);
-//        node_variables_features[i]["coil_cons_bind_mean"] = std::get<3>(_binding);
-//        node_variables_features[i]["coil_cons_bind_variance"] = std::get<4>(_binding);
-//
-//        //add variable's feature to vector
-//        features.emplace_back(node_variables_features[i]["cand_solfracs"]);
-//        features.emplace_back(node_variables_features[i]["cand_slack"]);
-//        features.emplace_back(node_variables_features[i]["dual_coil"]);
-//        features.emplace_back(node_variables_features[i]["coil_cons_degree"]);
-//        features.emplace_back(node_variables_features[i]["coil_obj_count"]);
-//        features.emplace_back(node_variables_features[i]["coil_obj_max"]);
-//        features.emplace_back(node_variables_features[i]["coil_obj_min"]);
-//        features.emplace_back(node_variables_features[i]["coil_obj_mean"]);
-//        features.emplace_back(node_variables_features[i]["coil_obj_variance"]);
-//        features.emplace_back(node_variables_features[i]["coil_y_count"]);
-//        features.emplace_back(node_variables_features[i]["coil_y_max"]);
-//        features.emplace_back(node_variables_features[i]["coil_y_min"]);
-//        features.emplace_back(node_variables_features[i]["coil_y_mean"]);
-//        features.emplace_back(node_variables_features[i]["coil_y_variance"]);
-//        features.emplace_back(node_variables_features[i]["coil_product_mean"]);
-//        features.emplace_back(node_variables_features[i]["coil_product_max"]);
-//        features.emplace_back(node_variables_features[i]["coil_product_min"]);
-//        features.emplace_back(node_variables_features[i]["coil_product_variance"]);
-//        features.emplace_back(node_variables_features[i]["coil_weight"]);
-//        features.emplace_back(node_variables_features[i]["coil_weight_C512"]);
-//        features.emplace_back(node_variables_features[i]["coil_weight_C008"]);
-//        features.emplace_back(node_variables_features[i]["coil_weight_RH"]);
-//        features.emplace_back(node_variables_features[i]["coil_num_SR"]);
-//        features.emplace_back(node_variables_features[i]["coil_constraint_bc"]);
-//        features.emplace_back(node_variables_features[i]["coil_in_up"]);
-//        features.emplace_back(node_variables_features[i]["coil_cons_bind_count"]);
-//        features.emplace_back(node_variables_features[i]["coil_cons_bind_max"]);
-//        features.emplace_back(node_variables_features[i]["coil_cons_bind_min"]);
-//        features.emplace_back(node_variables_features[i]["coil_cons_bind_mean"]);
-//        features.emplace_back(node_variables_features[i]["coil_cons_bind_variance"]);
-//    }
-//    std::vector<float> predictions;
-//    bst_ulong out_len = can_indexes.size();
-//    bst_ulong num_features = node_variables_features[0].size() - 2;
-//
-//    const float* out_result;
-//    DMatrixHandle dtest;
-//    XGDMatrixCreateFromMat(features.data(), out_len, num_features, -999.0f, &dtest);
-//    XGBoosterPredict(pre_model, dtest, 0, 0, 0, &out_len, &out_result);
-//
-//    predictions.assign(out_result, out_result + out_len);
-//
-//    //Obtain the index with the highest probability value
-//    int pre_index = std::distance(predictions.begin(), std::max_element(predictions.begin(), predictions.end()));
-//
-//    int select_coil = can_indexes[pre_index];
-//    std::shared_ptr<BranchingRule> includeCoil = std::make_shared<IncludeCoil>(select_coil);
-//    std::shared_ptr<BranchingRule> excludeCoil = std::make_shared<ExcludeCoil>(select_coil);
-//
-//    Node* includeNode = new Node(*current_node, includeCoil,
-//        current_node->name + "->select_" + std::to_string(select_coil));
-//    Node* excludeNode = new Node(*current_node, excludeCoil,
-//        current_node->name + "->no_select_" + std::to_string(select_coil));
-//
-//    unexploredNodes.push(includeNode);
-//    unexploredNodes.push(excludeNode);
-//    nodesGenerated += 2;
-//
-//}
+void BBTree::branch_strong_learn(BoosterHandle pre_model, Node* current_node, unsigned int nodeNumber)
+{
+	const double epsilon = 1e-6;
 
-//void BBTree::branch_strong_learn_MF(BoosterHandle pre_model, Node* current_node, unsigned int nodeNumber)
-//{
-//    if (current_node->depth >= 3) {
-//        double most_fractional_val = .5f;
-//        int index = -1;
-//        for (int i = 1; i < problem->getVertices() + 1; i++) {
-//            double val = 0;
-//            for (const auto& item : current_node->basicColumns) {
-//                auto& column = item.first;
-//                auto& coefficient = item.second;
-//                val += coefficient * column.contains(i);
-//            }
-//            if (val > 0 && val < 1) {
-//                if (std::fabs(val - .5f) < most_fractional_val) {
-//                    most_fractional_val = std::fabs(val - .5f);
-//                    index = i;
-//                }
-//            }
-//        }
-//        if (index == -1) {
-//            std::cout << "no find vertex with fractional flow" << std::endl;
-//            return;
-//        }
-//        std::shared_ptr<BranchingRule> includeCoil = std::make_shared<IncludeCoil>(index);
-//        std::shared_ptr<BranchingRule> excludeCoil = std::make_shared<ExcludeCoil>(index);
-//
-//        Node* includeNode = new Node(*current_node, includeCoil,
-//            current_node->name + "->select_" + std::to_string(index));
-//        Node* excludeNode = new Node(*current_node, excludeCoil,
-//            current_node->name + "->no_select_" + std::to_string(index));
-//
-//        unexploredNodes.push(includeNode);
-//        unexploredNodes.push(excludeNode);
-//        nodesGenerated += 2;
-//
-//        return;
-//    }
-//
-//    const double epsilon = 1e-6;
-//    std::map<int, std::map<std::string, double>> node_variables_features;
-//    initilize_features(node_variables_features);
-//
-//    std::vector<int> can_indexes;
-//    std::vector<float> features;
-//
-//    MasterProblem* rmp = current_node->cg->getRMPmodel();
-//
-//    for (int i = 0; i < problem->getVertices(); i++) {
-//        //slack and ceil distances
-//        double val = 0;
-//        for (const auto& item : current_node->basicColumns) {
-//            auto& column = item.first;
-//            auto& coefficient = item.second;
-//            val += coefficient * column.contains(i + 1);
-//        }
-//        if (val <= 0 || val >= 1) {
-//            continue;
-//        }
-//        //the idnex of candidate coil
-//        can_indexes.emplace_back(i + 1);
-//
-//        node_variables_features[i]["is_candidate"] = 1;
-//        node_variables_features[i]["cand_solfracs"] = val;
-//        node_variables_features[i]["cand_slack"] = 1 - val;
-//        //dual and degree
-//        node_variables_features[i]["dual_coil"] = rmp->getDualVariable(i) / (para->setUpCost * para->alpha2 + 200);
-//        node_variables_features[i]["coil_cons_degree"] = static_cast<double>(rmp->getVarNum(i)) / problem->getVertices();
-//
-//        //objective coefficient
-//        auto coef_values = rmp->getCoefAndValue(i + 1);
-//        std::vector<double> coefs_ = std::get<0>(coef_values);
-//        std::vector<double> coefs;
-//        for (int j = 0; j < coefs_.size(); j++) {
-//            coefs.emplace_back(coefs_[j] / (para->setUpCost * para->alpha2 + 200));
-//        }
-//        std::vector<double> values = std::get<1>(coef_values);
-//        std::vector<double> product(coefs.size());
-//        std::transform(coefs.begin(), coefs.end(), values.begin(), product.begin(), std::multiplies<double>());
-//
-//        node_variables_features[i]["coil_obj_count"] = static_cast<double>(coefs.size()) / (para->N * 2);
-//        node_variables_features[i]["coil_obj_max"] = *(std::max_element(coefs.begin(), coefs.end()));
-//        node_variables_features[i]["coil_obj_min"] = *(std::max_element(coefs.begin(), coefs.end()));
-//        node_variables_features[i]["coil_obj_mean"] = std::accumulate(coefs.begin(), coefs.end(), 0.0) / static_cast<double>(coefs.size());
-//        node_variables_features[i]["coil_obj_variance"] = Tool::calculateVariance(coefs);
-//
-//        node_variables_features[i]["coil_y_count"] = static_cast<double>(values.size()) / (para->N * 2);
-//        node_variables_features[i]["coil_y_max"] = *(std::max_element(values.begin(), values.end()));
-//        node_variables_features[i]["coil_y_min"] = *(std::max_element(values.begin(), values.end()));
-//        node_variables_features[i]["coil_y_mean"] = std::accumulate(values.begin(), values.end(), 0.0) / static_cast<double>(values.size());
-//        node_variables_features[i]["coil_y_variance"] = Tool::calculateVariance(values);
-//
-//        node_variables_features[i]["coil_product_mean"] = std::accumulate(product.begin(), product.end(), 0.0) / static_cast<double>(product.size());
-//        node_variables_features[i]["coil_product_max"] = *(std::max_element(product.begin(), product.end()));
-//        node_variables_features[i]["coil_product_min"] = *(std::min_element(product.begin(), product.end()));
-//        node_variables_features[i]["coil_product_variance"] = Tool::calculateVariance(product);
-//
-//        //weight
-//        node_variables_features[i]["coil_weight"] = problem->getWeight(i + 1) / 50;
-//        if (problem->getFlow(i + 1) == "C512") {
-//            node_variables_features[i]["coil_weight_C512"] = problem->getWeight(i + 1) / para->MassFlow[0];
-//        }
-//        else {
-//            node_variables_features[i]["coil_weight_C008"] = problem->getWeight(i + 1) / para->MassFlow[1];
-//        }
-//        node_variables_features[i]["coil_weight_RH"] = rmp->getWeightRH(i + 1);
-//
-//        //number in SR set
-//        node_variables_features[i]["coil_num_SR"] = rmp->getNumSRofCoil(i + 1);
-//
-//        //number of basic columns in coil i's constraint
-//        node_variables_features[i]["coil_constraint_bc"] = rmp->getBCconstraint(i);
-//
-//        //coil in the integer solution
-//        int _inIntegerSol = 0;
-//        bool isFound = false;
-//        for (const auto& item : nodeAttainUb->mipBaseColumns) {
-//            for (const auto& _coil : item.first.getRoute()) {
-//                if (_coil == i + 1) {
-//                    _inIntegerSol = 1;
-//                    isFound = true;
-//                    break;
-//                }
-//            }
-//            if (isFound) {
-//                break;
-//            }
-//        }
-//        node_variables_features[i]["coil_in_up"] = _inIntegerSol;
-//
-//        auto _binding = rmp->isBinding(i);
-//        node_variables_features[i]["coil_cons_bind_count"] = std::get<0>(_binding);
-//        node_variables_features[i]["coil_cons_bind_max"] = std::get<1>(_binding);
-//        node_variables_features[i]["coil_cons_bind_min"] = std::get<2>(_binding);
-//        node_variables_features[i]["coil_cons_bind_mean"] = std::get<3>(_binding);
-//        node_variables_features[i]["coil_cons_bind_variance"] = std::get<4>(_binding);
-//
-//        //add variable's feature to vector
-//        features.emplace_back(node_variables_features[i]["cand_solfracs"]);
-//        features.emplace_back(node_variables_features[i]["cand_slack"]);
-//        features.emplace_back(node_variables_features[i]["dual_coil"]);
-//        features.emplace_back(node_variables_features[i]["coil_cons_degree"]);
-//        features.emplace_back(node_variables_features[i]["coil_obj_count"]);
-//        features.emplace_back(node_variables_features[i]["coil_obj_max"]);
-//        features.emplace_back(node_variables_features[i]["coil_obj_min"]);
-//        features.emplace_back(node_variables_features[i]["coil_obj_mean"]);
-//        features.emplace_back(node_variables_features[i]["coil_obj_variance"]);
-//        features.emplace_back(node_variables_features[i]["coil_y_count"]);
-//        features.emplace_back(node_variables_features[i]["coil_y_max"]);
-//        features.emplace_back(node_variables_features[i]["coil_y_min"]);
-//        features.emplace_back(node_variables_features[i]["coil_y_mean"]);
-//        features.emplace_back(node_variables_features[i]["coil_y_variance"]);
-//        features.emplace_back(node_variables_features[i]["coil_product_mean"]);
-//        features.emplace_back(node_variables_features[i]["coil_product_max"]);
-//        features.emplace_back(node_variables_features[i]["coil_product_min"]);
-//        features.emplace_back(node_variables_features[i]["coil_product_variance"]);
-//        features.emplace_back(node_variables_features[i]["coil_weight"]);
-//        features.emplace_back(node_variables_features[i]["coil_weight_C512"]);
-//        features.emplace_back(node_variables_features[i]["coil_weight_C008"]);
-//        features.emplace_back(node_variables_features[i]["coil_weight_RH"]);
-//        features.emplace_back(node_variables_features[i]["coil_num_SR"]);
-//        features.emplace_back(node_variables_features[i]["coil_constraint_bc"]);
-//        features.emplace_back(node_variables_features[i]["coil_in_up"]);
-//        features.emplace_back(node_variables_features[i]["coil_cons_bind_count"]);
-//        features.emplace_back(node_variables_features[i]["coil_cons_bind_max"]);
-//        features.emplace_back(node_variables_features[i]["coil_cons_bind_min"]);
-//        features.emplace_back(node_variables_features[i]["coil_cons_bind_mean"]);
-//        features.emplace_back(node_variables_features[i]["coil_cons_bind_variance"]);
-//    }
-//    std::vector<float> predictions;
-//    bst_ulong out_len = can_indexes.size();
-//    bst_ulong num_features = node_variables_features[0].size() - 2;
-//
-//    const float* out_result;
-//    DMatrixHandle dtest;
-//    XGDMatrixCreateFromMat(features.data(), out_len, num_features, -999.0f, &dtest);
-//    XGBoosterPredict(pre_model, dtest, 0, 0, 0, &out_len, &out_result);
-//
-//    predictions.assign(out_result, out_result + out_len);
-//
-//    //Obtain the index with the highest probability value
-//    int pre_index = std::distance(predictions.begin(), std::max_element(predictions.begin(), predictions.end()));
-//
-//    int select_coil = can_indexes[pre_index];
-//    std::shared_ptr<BranchingRule> includeCoil = std::make_shared<IncludeCoil>(select_coil);
-//    std::shared_ptr<BranchingRule> excludeCoil = std::make_shared<ExcludeCoil>(select_coil);
-//
-//    Node* includeNode = new Node(*current_node, includeCoil,
-//        current_node->name + "->select_" + std::to_string(select_coil));
-//    Node* excludeNode = new Node(*current_node, excludeCoil,
-//        current_node->name + "->no_select_" + std::to_string(select_coil));
-//
-//    unexploredNodes.push(includeNode);
-//    unexploredNodes.push(excludeNode);
-//    nodesGenerated += 2;
-//}
-//
-//void BBTree::initilize_features(std::map<int, std::map<std::string, double>>& _node_features)
-//{
-//    for (int i = 0; i < problem->getVertices(); i++) {
-//        _node_features[i];
-//        //the statics features maybe not necessary
-//        //coefs(3) 
-//
-//        //_node_features[i]["coefs"] = 0; 
-//        //_node_features[i]["coefs_pos"] = 0; 
-//        //_node_features[i]["coefs_neg"] = 0; 
-//
-//        ////Numfeatures
-//        //_node_features[i]["nnzrs"] = 0;
-//        ////Stafeatures degrees(4)
-//        //_node_features[i]["root_cdeg_mean"] = 0;
-//        //_node_features[i]["root_cdeg_var"] = 0;
-//        //_node_features[i]["root_cdeg_min"] = 0;
-//        //_node_features[i]["root_cdeg_max"] = 0;
-//
-//        ////Stafeatures coeffs.(10)
-//        //_node_features[i]["root_pcoefs_count"] = 0;
-//        //_node_features[i]["root_pcoefs_var"] = 0;
-//        //_node_features[i]["root_pcoefs_mean"] = 0;
-//        //_node_features[i]["root_pcoefs_min"] = 0;
-//        //_node_features[i]["root_pcoefs_max"] = 0;
-//        //_node_features[i]["root_ncoefs_count"] = 0;
-//        //_node_features[i]["root_ncoefs_var"] = 0;
-//        //_node_features[i]["root_ncoefs_mean"] = 0;
-//        //_node_features[i]["root_ncoefs_min"] = 0;
-//        //_node_features[i]["root_ncoefs_max"] = 0;
-//
-//        //---featuresamic------------------
-//        //Slafeaturesces(2)
-//        _node_features[i]["is_candidate"] = 0;
-//        //_node_features[i]["is_branch"] = 0;
-//        _node_features[i]["cand_solfracs"] = 0;
-//        _node_features[i]["cand_slack"] = 0;
-//
-//        //duafeaturesiables in this constraint
-//        _node_features[i]["dual_coil"] = 0;
-//        _node_features[i]["coil_cons_degree"] = 0;
-//
-//        //objfeatures
-//        _node_features[i]["coil_obj_count"] = 0;
-//        _node_features[i]["coil_obj_mean"] = 0;
-//        _node_features[i]["coil_obj_max"] = 0;
-//        _node_features[i]["coil_obj_min"] = 0;
-//        _node_features[i]["coil_obj_variance"] = 0;
-//
-//        _node_features[i]["coil_y_count"] = 0;
-//        _node_features[i]["coil_y_mean"] = 0;
-//        _node_features[i]["coil_y_max"] = 0;
-//        _node_features[i]["coil_y_min"] = 0;
-//        _node_features[i]["coil_y_variance"] = 0;
-//
-//        _node_features[i]["coil_product_mean"] = 0;
-//        _node_features[i]["coil_product_max"] = 0;
-//        _node_features[i]["coil_product_min"] = 0;
-//        _node_features[i]["coil_product_variance"] = 0;
-//
-//        //coifeatures
-//        _node_features[i]["coil_weight"] = 0;
-//        _node_features[i]["coil_weight_C512"] = 0;
-//        _node_features[i]["coil_weight_C008"] = 0;
-//        _node_features[i]["coil_weight_RH"] = 0;
-//
-//        //Psefeaturesranching on this variable, compute
-//        //_node_features[i]["cand_obj_up"] = 0;
-//        //_node_features[i]["cand_obj_down"] = 0;
-//
-//        //_node_features[i]["cand_ps_up"] = 0;
-//        //_node_features[i]["cand_ps_down"] = 0;
-//        //_node_features[i]["cand_ps_sum"] = 0;
-//        //_node_features[i]["cand_ps_ratio"] = 0;
-//        //_node_features[i]["cand_ps_product"] = 0;
-//
-//        //Inffeaturesics (4)
-//        //_node_features[i]["cand_frac_up_infeas"] = 0;
-//        //_node_features[i]["cand_frac_down_infeas"] = 0;
-//        //_node_features[i]["infeasible_num"] = 0;
-//
-//        //Stafeatures degrees (7)
-//        //_node_features[i]["cand_cdeg_mean"] = 0;
-//        //_node_features[i]["cand_cdeg_var"] = 0;
-//        //_node_features[i]["cand_cdeg_min"] = 0;
-//        //_node_features[i]["cand_cdeg_max"] = 0;
-//        //_node_features[i]["cand_cdeg_mean_ratio"] = 0;
-//        //_node_features[i]["cand_cdeg_min_ratio"] = 0;
-//        //_node_features[i]["cand_cdeg_max_ratio"] = 0;
-//
-//        //Minfeatures constraint coeffs. to RHS (4)
-//        //_node_features[i]["prhs_ratio_max"] = -1;
-//        //_node_features[i]["prhs_ratio_min"] = 1;
-//        //_node_features[i]["nrhs_ratio_max"] = -1;
-//        //_node_features[i]["nrhs_ratio_min"] = 1;
-//
-//        //Minfeaturesl coefficient ratios (8)
-//        //_node_features[i]["ota_pp_max"] = 0;
-//        //_node_features[i]["ota_pp_min"] = 1;
-//        //_node_features[i]["ota_pn_max"] = 0;
-//        //_node_features[i]["ota_pn_min"] = 1;
-//        //_node_features[i]["ota_np_max"] = 0;
-//        //_node_features[i]["ota_np_min"] = 1;
-//        //_node_features[i]["ota_nn_max"] = 0;
-//        //_node_features[i]["ota_nn_min"] = 1;
-//
-//        _node_features[i]["coil_num_SR"] = 0;
-//        _node_features[i]["coil_constraint_bc"] = 0;
-//        _node_features[i]["coil_in_up"] = 0;
-//        _node_features[i]["coil_cons_bind_count"] = 0;
-//        _node_features[i]["coil_cons_bind_max"] = 0;
-//        _node_features[i]["coil_cons_bind_min"] = 0;
-//        _node_features[i]["coil_cons_bind_mean"] = 0;
-//        _node_features[i]["coil_cons_bind_variance"] = 0;
-//
-//        _node_features[i]["coil_label"] = 0;
-//    }
-//}
+	std::map<int, std::map<std::string, double>> node_variables_features;
+	initilize_features(node_variables_features);
+
+	std::vector<int> can_indexes;
+	std::vector<float> features;
+
+	MasterProblem* rmp = current_node->cg->getRMPmodel();
+
+	for (int i = 0; i < problem->getVertices(); i++) {
+		//slack and ceil distances
+		double val = 0;
+		for (const auto& item : current_node->basicColumns) {
+			auto& column = item.first;
+			auto& coefficient = item.second;
+			val += coefficient * column.contains(i + 1);
+		}
+		if (val <= 0 || val >= 1) {
+			continue;
+		}
+		//the idnex of candidate coil
+		can_indexes.emplace_back(i + 1);
+
+		node_variables_features[i]["is_candidate"] = 1;
+		node_variables_features[i]["cand_solfracs"] = val;
+		node_variables_features[i]["cand_slack"] = 1 - val;
+		//dual and degree
+		node_variables_features[i]["dual_coil"] = rmp->getDualVariable(i) / (para->setUpCost * para->alpha2 + 200);
+		node_variables_features[i]["coil_cons_degree"] = static_cast<double>(rmp->getVarNum(i)) / problem->getVertices();
+
+		//objective coefficient
+		auto coef_values = rmp->getCoefAndValue(i + 1);
+		std::vector<double> coefs_ = std::get<0>(coef_values);
+		std::vector<double> coefs;
+		for (int j = 0; j < coefs_.size(); j++) {
+			coefs.emplace_back(coefs_[j] / (para->setUpCost * para->alpha2 + 200));
+		}
+		std::vector<double> values = std::get<1>(coef_values);
+		std::vector<double> product(coefs.size());
+		std::transform(coefs.begin(), coefs.end(), values.begin(), product.begin(), std::multiplies<double>());
+
+		node_variables_features[i]["coil_obj_count"] = static_cast<double>(coefs.size()) / (para->N * 2);
+		node_variables_features[i]["coil_obj_max"] = *(std::max_element(coefs.begin(), coefs.end()));
+		node_variables_features[i]["coil_obj_min"] = *(std::max_element(coefs.begin(), coefs.end()));
+		node_variables_features[i]["coil_obj_mean"] = std::accumulate(coefs.begin(), coefs.end(), 0.0) / static_cast<double>(coefs.size());
+		node_variables_features[i]["coil_obj_variance"] = Tool::calculateVariance(coefs);
+
+		node_variables_features[i]["coil_y_count"] = static_cast<double>(values.size()) / (para->N * 2);
+		node_variables_features[i]["coil_y_max"] = *(std::max_element(values.begin(), values.end()));
+		node_variables_features[i]["coil_y_min"] = *(std::max_element(values.begin(), values.end()));
+		node_variables_features[i]["coil_y_mean"] = std::accumulate(values.begin(), values.end(), 0.0) / static_cast<double>(values.size());
+		node_variables_features[i]["coil_y_variance"] = Tool::calculateVariance(values);
+
+		node_variables_features[i]["coil_product_mean"] = std::accumulate(product.begin(), product.end(), 0.0) / static_cast<double>(product.size());
+		node_variables_features[i]["coil_product_max"] = *(std::max_element(product.begin(), product.end()));
+		node_variables_features[i]["coil_product_min"] = *(std::min_element(product.begin(), product.end()));
+		node_variables_features[i]["coil_product_variance"] = Tool::calculateVariance(product);
+
+		//weight
+		node_variables_features[i]["coil_weight"] = problem->getWeight(i + 1) / 50;
+		if (problem->getFlow(i + 1) == "C512") {
+			node_variables_features[i]["coil_weight_C512"] = problem->getWeight(i + 1) / para->MassFlow[0];
+		}
+		else {
+			node_variables_features[i]["coil_weight_C008"] = problem->getWeight(i + 1) / para->MassFlow[1];
+		}
+		node_variables_features[i]["coil_weight_RH"] = rmp->getWeightRH(i + 1);
+
+		//number in SR set
+		node_variables_features[i]["coil_num_SR"] = rmp->getNumSRofCoil(i + 1);
+
+		//number of basic columns in coil i's constraint
+		node_variables_features[i]["coil_constraint_bc"] = rmp->getBCconstraint(i);
+
+		//coil in the integer solution
+		int _inIntegerSol = 0;
+		bool isFound = false;
+		for (const auto& item : nodeAttainUb->mipBaseColumns) {
+			for (const auto& _coil : item.first.getRoute()) {
+				if (_coil == i + 1) {
+					_inIntegerSol = 1;
+					isFound = true;
+					break;
+				}
+			}
+			if (isFound) {
+				break;
+			}
+		}
+		node_variables_features[i]["coil_in_up"] = _inIntegerSol;
+
+		auto _binding = rmp->isBinding(i);
+		node_variables_features[i]["coil_cons_bind_count"] = std::get<0>(_binding);
+		node_variables_features[i]["coil_cons_bind_max"] = std::get<1>(_binding);
+		node_variables_features[i]["coil_cons_bind_min"] = std::get<2>(_binding);
+		node_variables_features[i]["coil_cons_bind_mean"] = std::get<3>(_binding);
+		node_variables_features[i]["coil_cons_bind_variance"] = std::get<4>(_binding);
+
+		//add variable's feature to vector
+		features.emplace_back(node_variables_features[i]["cand_solfracs"]);
+		features.emplace_back(node_variables_features[i]["cand_slack"]);
+		features.emplace_back(node_variables_features[i]["dual_coil"]);
+		features.emplace_back(node_variables_features[i]["coil_cons_degree"]);
+		features.emplace_back(node_variables_features[i]["coil_obj_count"]);
+		features.emplace_back(node_variables_features[i]["coil_obj_max"]);
+		features.emplace_back(node_variables_features[i]["coil_obj_min"]);
+		features.emplace_back(node_variables_features[i]["coil_obj_mean"]);
+		features.emplace_back(node_variables_features[i]["coil_obj_variance"]);
+		features.emplace_back(node_variables_features[i]["coil_y_count"]);
+		features.emplace_back(node_variables_features[i]["coil_y_max"]);
+		features.emplace_back(node_variables_features[i]["coil_y_min"]);
+		features.emplace_back(node_variables_features[i]["coil_y_mean"]);
+		features.emplace_back(node_variables_features[i]["coil_y_variance"]);
+		features.emplace_back(node_variables_features[i]["coil_product_mean"]);
+		features.emplace_back(node_variables_features[i]["coil_product_max"]);
+		features.emplace_back(node_variables_features[i]["coil_product_min"]);
+		features.emplace_back(node_variables_features[i]["coil_product_variance"]);
+		features.emplace_back(node_variables_features[i]["coil_weight"]);
+		features.emplace_back(node_variables_features[i]["coil_weight_C512"]);
+		features.emplace_back(node_variables_features[i]["coil_weight_C008"]);
+		features.emplace_back(node_variables_features[i]["coil_weight_RH"]);
+		features.emplace_back(node_variables_features[i]["coil_num_SR"]);
+		features.emplace_back(node_variables_features[i]["coil_constraint_bc"]);
+		features.emplace_back(node_variables_features[i]["coil_in_up"]);
+		features.emplace_back(node_variables_features[i]["coil_cons_bind_count"]);
+		features.emplace_back(node_variables_features[i]["coil_cons_bind_max"]);
+		features.emplace_back(node_variables_features[i]["coil_cons_bind_min"]);
+		features.emplace_back(node_variables_features[i]["coil_cons_bind_mean"]);
+		features.emplace_back(node_variables_features[i]["coil_cons_bind_variance"]);
+	}
+	std::vector<float> predictions;
+	bst_ulong out_len = can_indexes.size();
+	bst_ulong num_features = node_variables_features[0].size() - 2;
+
+	const float* out_result;
+	DMatrixHandle dtest;
+	XGDMatrixCreateFromMat(features.data(), out_len, num_features, -999.0f, &dtest);
+	XGBoosterPredict(pre_model, dtest, 0, 0, 0, &out_len, &out_result);
+
+	predictions.assign(out_result, out_result + out_len);
+
+	//Obtain the index with the highest probability value
+	int pre_index = std::distance(predictions.begin(), std::max_element(predictions.begin(), predictions.end()));
+
+	int select_coil = can_indexes[pre_index];
+	std::shared_ptr<BranchingRule> includeCoil = std::make_shared<IncludeCoil>(select_coil);
+	std::shared_ptr<BranchingRule> excludeCoil = std::make_shared<ExcludeCoil>(select_coil);
+
+	Node* includeNode = new Node(*current_node, includeCoil,
+		current_node->name + "->select_" + std::to_string(select_coil));
+	Node* excludeNode = new Node(*current_node, excludeCoil,
+		current_node->name + "->no_select_" + std::to_string(select_coil));
+
+	unexploredNodes.push(includeNode);
+	unexploredNodes.push(excludeNode);
+	nodesGenerated += 2;
+}
+
+void BBTree::initilize_features(std::map<int, std::map<std::string, double>>& _node_features)
+{
+	for (int i = 0; i < problem->getVertices(); i++) {
+		_node_features[i];
+
+		//---featuresamic------------------
+		//Slafeaturesces(2)
+		_node_features[i]["is_candidate"] = 0;
+		//_node_features[i]["is_branch"] = 0;
+		_node_features[i]["cand_solfracs"] = 0;
+		_node_features[i]["cand_slack"] = 0;
+
+		//duafeaturesiables in this constraint
+		_node_features[i]["dual_coil"] = 0;
+		_node_features[i]["coil_cons_degree"] = 0;
+
+		//objfeatures
+		_node_features[i]["coil_obj_count"] = 0;
+		_node_features[i]["coil_obj_mean"] = 0;
+		_node_features[i]["coil_obj_max"] = 0;
+		_node_features[i]["coil_obj_min"] = 0;
+		_node_features[i]["coil_obj_variance"] = 0;
+
+		_node_features[i]["coil_y_count"] = 0;
+		_node_features[i]["coil_y_mean"] = 0;
+		_node_features[i]["coil_y_max"] = 0;
+		_node_features[i]["coil_y_min"] = 0;
+		_node_features[i]["coil_y_variance"] = 0;
+
+		_node_features[i]["coil_product_mean"] = 0;
+		_node_features[i]["coil_product_max"] = 0;
+		_node_features[i]["coil_product_min"] = 0;
+		_node_features[i]["coil_product_variance"] = 0;
+
+		//coifeatures
+		_node_features[i]["coil_weight"] = 0;
+		_node_features[i]["coil_weight_C512"] = 0;
+		_node_features[i]["coil_weight_C008"] = 0;
+		_node_features[i]["coil_weight_RH"] = 0;
+		_node_features[i]["coil_num_SR"] = 0;
+		_node_features[i]["coil_constraint_bc"] = 0;
+		_node_features[i]["coil_in_up"] = 0;
+		_node_features[i]["coil_cons_bind_count"] = 0;
+		_node_features[i]["coil_cons_bind_max"] = 0;
+		_node_features[i]["coil_cons_bind_min"] = 0;
+		_node_features[i]["coil_cons_bind_mean"] = 0;
+		_node_features[i]["coil_cons_bind_variance"] = 0;
+
+		_node_features[i]["coil_label"] = 0;
+	}
+}
+
 
 void BBTree::saveFatures(std::vector<std::map<int, std::map<std::string, double>>>& all_features)
 {
-	std::string filename = "Feature_R/coils_32_2_R.txt";
+	std::string filename = "Feature/coils.txt";
 
 	std::ofstream outFile(filename);
 	if (!outFile.is_open()) {
@@ -1163,17 +853,6 @@ void BBTree::initialize_ng_sets()
 			pool_coil_ngsets[item.first][i].reset(0);
 		}
 	}
-	
-	//std::string name = "C502016_18";
-	//for (int i = 0; i < poolIndex[name].size(); i++) {
-	//	std::cout << i << ": ";
-	//	for (int j = 0; j < Config::MAX_COILS; j++) {
-	//		if (pool_coil_ngsets[name][i][j] == 1) {
-	//			std::cout << j << " ";
-	//		}
-	//	}
-	//	std::cout << std::endl;
-	//}
 }
 
 std::vector<size_t> BBTree::get_k_nearest_neighbors(int coil_index, std::vector<int>& all_coils, int k_nearest) const

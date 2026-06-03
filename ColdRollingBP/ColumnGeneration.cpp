@@ -264,7 +264,6 @@ bool ColumnGeneration::executeAndCutR_depth(unsigned int node_number, int depth)
 		}
 		num++;
 		if (num > 60) {
-			std::cout << "maybe error in cg" << std::endl;
 			solveRMP = true;
 			break;
 		}
